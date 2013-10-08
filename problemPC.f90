@@ -104,8 +104,8 @@ program problemPC
 
   !Other IPOPT params
 
-  probtype=1
-  kprob=2
+  probtype=2
+  kprob=4
 
   ! SD for area design variables
   sigmax(1)=0.05
@@ -114,9 +114,9 @@ program problemPC
 
   ! SD for orientation phi
 
-  sigmax(4)=1.0*pi/180.0
-  sigmax(5)=1.0*pi/180.0
-  sigmax(6)=1.0*pi/180.0
+  sigmax(4)=1.5*pi/180.0
+  sigmax(5)=1.5*pi/180.0
+  sigmax(6)=1.5*pi/180.0
 
   do i=i,n
      dat(i)=sigmax(i)
@@ -285,7 +285,7 @@ subroutine EV_F(N, X, NEW_X, F, IDAT, DAT, IERR)
 
 !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),4,4,0,probtype,&
+  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),2,2,0,probtype,&
        &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
 
@@ -339,7 +339,7 @@ subroutine EV_G(N, X, NEW_X, M, G, IDAT, DAT, IERR)
      !---- MEAN OF INEQUALITY CONSTRAINT i
      !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),4,4,0,probtype,&
+     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),2,2,0,probtype,&
           &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
   if (IDAT(2).eq.1) then ! Deterministic with PC
@@ -395,7 +395,7 @@ subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
   !---- MEAN OF INEQUALITY CONSTRAINT i
   !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
   
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),4,4,0,probtype,&
+  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),2,2,0,probtype,&
        &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
 
@@ -589,25 +589,23 @@ subroutine EV_JAC_G(TASK, N, X, NEW_X, M, NZ, ACON, AVAR, A,IDAT, DAT, IERR)
      !---- MEAN OF INEQUALITY CONSTRAINT i
      !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),4,4,0,probtype,&
+     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),2,2,0,probtype,&
           &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
         if (IDAT(2).eq.1) then ! Deterministic with PC
            fvartmp=0.0d0
            fvarprimetmp=0.0d0
         end if
-
-
-!        do j=1,N
-           cgrad(i,:)=fmeanprimetmp(:)+dble(kprob)*fvarprimetmp(:)
-!           if (fvartmp.ne.0.0) then
-!              cgrad(i,j)=cgrad(i,j)+dble(kprob)*fvarprimetmp(j)/(2.0*sqrt(fvartmp))
- !          endif
-!        end do
-
+        
+        
+        do j=1,N
+           cgrad(i,j)=fmeanprimetmp(j)
+           if (fvartmp.ne.0.0) then
+              cgrad(i,j)=cgrad(i,j)+dble(kprob)*fvarprimetmp(j)/(2.0*sqrt(fvartmp))
+           endif
+        end do
      end do
      
-
 
          ! Assemble
          A(1)=cgrad(1,1)
@@ -782,7 +780,7 @@ subroutine EV_HESS(TASK, N, X, NEW_X, OBJFACT, M, LAM, NEW_LAM,NNZH, IRNH, ICNH,
 !!$     do ii=0,m
 !!$
 !!$        !      call PCestimate(dim,xavgin,xstdin,fctin,fctindxin,orderinitial,orderfinal,statin,fmeanout,fvarout,fmeanprimeout,fvarprimeout)
-!!$        call  PCestimate(N,x,sigmax,11,ii,4,4,0,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+!!$        call  PCestimate(N,x,sigmax,11,ii,2,2,0,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 !!$
 !!$        if (ii.eq.0) then
 !!$           
