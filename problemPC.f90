@@ -73,13 +73,13 @@ program problemPC
   ! Max constraint values
   
   !Tensile
-  dat(1000+6)=2000.0    ! psi tensile_sigma1_max=dat(6)      
-  dat(1000+7)=2000.0    ! psi tensile_sigma2_max=dat(7)
-  dat(1000+8)=2000.0    ! psi tensile_sigma3_max=dat(8)
+  dat(1000+6)=5000.0    ! psi tensile_sigma1_max=dat(6)      
+  dat(1000+7)=20000.0    ! psi tensile_sigma2_max=dat(7)
+  dat(1000+8)=5000.0    ! psi tensile_sigma3_max=dat(8)
   !Compressive
-  dat(1000+9)=2000.0    ! psi comp_sigma1_max=dat(9)
-  dat(1000+10)=2000.0   ! psi comp_sigma2_max=dat(10)
-  dat(1000+11)=2000.0   ! psi comp_sigma3_max=dat(11)
+  dat(1000+9)=5000.0    ! psi comp_sigma1_max=dat(9)
+  dat(1000+10)=20000.0   ! psi comp_sigma2_max=dat(10)
+  dat(1000+11)=5000.0   ! psi comp_sigma3_max=dat(11)
   !Displacement
   dat(1000+12)=0.005    ! in  max_u_disp=dat(12)
   dat(1000+13)=0.005    ! in  max_v_disp=dat(12)
@@ -104,8 +104,8 @@ program problemPC
 
   !Other IPOPT params
 
-  probtype=2
-  kprob=4
+  probtype=1
+  kprob=0
 
   ! SD for area design variables
   sigmax(1)=0.05
@@ -114,9 +114,9 @@ program problemPC
 
   ! SD for orientation phi
 
-  sigmax(4)=1.5*pi/180.0
-  sigmax(5)=1.5*pi/180.0
-  sigmax(6)=1.5*pi/180.0
+  sigmax(4)=1.0*pi/180.0
+  sigmax(5)=1.0*pi/180.0
+  sigmax(6)=1.0*pi/180.0
 
   do i=i,n
      dat(i)=sigmax(i)
@@ -296,7 +296,13 @@ subroutine EV_F(N, X, NEW_X, F, IDAT, DAT, IERR)
 
   dat(100+1)=fmeantmp
   dat(100+2)=fvartmp
-!  if (id_proc.eq.0) print *,'Calculate Objective',X,fmeantmp,fvartmp
+  
+  
+  if (id_proc.eq.0) then
+     print*,''
+     write(*,'(4x,a,3F13.4)') '>>Objective:',fmeantmp,fvartmp,fmeantmp+fvartmp
+     print*,''
+  end if
 
   !---- COMBINED OBJECTIVE FUNCTION
 
@@ -401,6 +407,12 @@ subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
 
   !---- GRADIENT OF OBJECTIVE FUNCTION
 
+  
+  if (id_proc.eq.0)then
+     print *,' >> Gradient of obj:'
+  end if
+
+
   do i=1,n
 
 
@@ -409,10 +421,13 @@ subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
         fvarprimetmp=0.0d0
      end if
 
+  if (id_proc.eq.0)  print*,fmeanprimetmp(i),fvarprimetmp(i)
 
      GRAD(i)=fmeanprimetmp(i)+fvarprimetmp(i)
 
   end do
+
+if (id_proc.eq.0)print *,''
 
   IERR = 0
   return
@@ -780,7 +795,7 @@ subroutine EV_HESS(TASK, N, X, NEW_X, OBJFACT, M, LAM, NEW_LAM,NNZH, IRNH, ICNH,
 !!$     do ii=0,m
 !!$
 !!$        !      call PCestimate(dim,xavgin,xstdin,fctin,fctindxin,orderinitial,orderfinal,statin,fmeanout,fvarout,fmeanprimeout,fvarprimeout)
-!!$        call  PCestimate(N,x,sigmax,11,ii,2,2,0,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+!!$        call  PCestimate(N,x,sigmax,11,ii,2,2,1,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 !!$
 !!$        if (ii.eq.0) then
 !!$           
@@ -873,7 +888,12 @@ subroutine ITER_CB(ALG_MODE, ITER_COUNT,OBJVAL, INF_PR, INF_DU,MU, DNORM, REGU_S
   !     And set ISTOP to 1 if you want Ipopt to stop now.  Below is just a
   !     simple example.
   !
-  if (ITER_COUNT .gt. 1 .and. DNORM.le.1D-03) ISTOP = 1
+  
+  if (ITER_COUNT .gt. 1 .and. DNORM.le.0.5D-02.and.inf_pr.le.1.0d-02) then
+
+     ISTOP = 1
+
+  end if
 
   return
 end subroutine ITER_CB
