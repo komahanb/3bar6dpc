@@ -285,7 +285,7 @@ subroutine EV_F(N, X, NEW_X, F, IDAT, DAT, IERR)
 
 !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),2,2,0,probtype,&
+  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),3,3,0,probtype,&
        &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
 
@@ -345,7 +345,7 @@ subroutine EV_G(N, X, NEW_X, M, G, IDAT, DAT, IERR)
      !---- MEAN OF INEQUALITY CONSTRAINT i
      !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),2,2,0,probtype,&
+     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),3,3,0,probtype,&
           &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
   if (IDAT(2).eq.1) then ! Deterministic with PC
@@ -401,7 +401,7 @@ subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
   !---- MEAN OF INEQUALITY CONSTRAINT i
   !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
   
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),2,2,0,probtype,&
+  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),3,3,0,probtype,&
        &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
 
@@ -604,7 +604,7 @@ subroutine EV_JAC_G(TASK, N, X, NEW_X, M, NZ, ACON, AVAR, A,IDAT, DAT, IERR)
      !---- MEAN OF INEQUALITY CONSTRAINT i
      !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),2,2,0,probtype,&
+     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),3,3,0,probtype,&
           &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
         if (IDAT(2).eq.1) then ! Deterministic with PC
@@ -795,7 +795,7 @@ subroutine EV_HESS(TASK, N, X, NEW_X, OBJFACT, M, LAM, NEW_LAM,NNZH, IRNH, ICNH,
 !!$     do ii=0,m
 !!$
 !!$        !      call PCestimate(dim,xavgin,xstdin,fctin,fctindxin,orderinitial,orderfinal,statin,fmeanout,fvarout,fmeanprimeout,fvarprimeout)
-!!$        call  PCestimate(N,x,sigmax,11,ii,2,2,1,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+!!$        call  PCestimate(N,x,sigmax,11,ii,3,3,1,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 !!$
 !!$        if (ii.eq.0) then
 !!$           
