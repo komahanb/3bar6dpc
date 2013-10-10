@@ -84,7 +84,7 @@ program problemPC
   dat(1000+12)=0.005    ! in  max_u_disp=dat(12)
   dat(1000+13)=0.005    ! in  max_v_disp=dat(12)
   dat(1000+14)=1.0      ! Factor of safety
-  dat(1000+20)=6      ! filenum for PC
+  dat(1000+20)=77      ! filenum for PC
 
   !============
   !  DAT array
@@ -104,7 +104,9 @@ program problemPC
 
   !Other IPOPT params
 
-  probtype=2
+  probtype(1:3)=2
+  probtype(4:6)=1
+
   kprob=0
 
   ! SD for area design variables
@@ -124,7 +126,7 @@ program problemPC
 
   IDAT(1)=kprob
   IDAT(2)=0
-  IDAT(3)=probtype
+  IDAT(3:N+2)=probtype(1:N)
 
   ! Area design variables
 
@@ -271,12 +273,11 @@ subroutine EV_F(N, X, NEW_X, F, IDAT, DAT, IERR)
   integer IERR
   double precision fmin,fmax,gradmin(N-1),gradmax(N-1),gtol,low(N-1),up(N-1),Xsave(N)
   double precision  rho, L, sigmay, pi, p, E, Fs 
-
-  
+  integer::myflag(10) 
 
   kprob=IDAT(1)
-  probtype=IDAT(3)
-
+  probtype(1:N)=IDAT(3:N+2)
+  
   do i=1,N
      sigmax(i)=DAT(i)
   end do
@@ -285,8 +286,7 @@ subroutine EV_F(N, X, NEW_X, F, IDAT, DAT, IERR)
 
 !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),1,2,3,0,probtype,&
-       &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),1,2,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
 
   if (IDAT(2).eq.1) then ! Deterministic with PC
@@ -332,10 +332,12 @@ subroutine EV_G(N, X, NEW_X, M, G, IDAT, DAT, IERR)
   integer IERR, i, j, cnt
   double precision fmin,fmax,gradmin(N-1),gradmax(N-1),gtol,low(N-1),up(N-1),Xsave(N)
   double precision  rho, L, sigmay, pi, p, E, Fs 
+  integer::myflag(10) 
 
 
   kprob=IDAT(1)
-  probtype=IDAT(3)
+  probtype(1:N)=IDAT(3:N+2)
+
   do i=1,N
      sigmax(i)=DAT(i)
   end do
@@ -345,8 +347,7 @@ subroutine EV_G(N, X, NEW_X, M, G, IDAT, DAT, IERR)
      !---- MEAN OF INEQUALITY CONSTRAINT i
      !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),1,2,3,0,probtype,&
-          &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),1,2,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
   if (IDAT(2).eq.1) then ! Deterministic with PC
      fvartmp=0.0d0
@@ -390,9 +391,11 @@ subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
   integer IDAT(*),kprob,NMC
   integer IERR
   double precision  rho, L, sigmay, pi, p, E, Fs 
+  integer::myflag(10) 
 
   kprob=IDAT(1)
-  probtype= IDAT(3)
+
+  probtype(1:N)=IDAT(3:N+2)
 
   do i=1,N
      sigmax(i)=DAT(i)
@@ -401,8 +404,7 @@ subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
   !---- MEAN OF INEQUALITY CONSTRAINT i
   !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
   
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),1,2,3,0,probtype,&
-       &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),1,2,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
 
   !---- GRADIENT OF OBJECTIVE FUNCTION
@@ -453,6 +455,8 @@ subroutine EV_JAC_G(TASK, N, X, NEW_X, M, NZ, ACON, AVAR, A,IDAT, DAT, IERR)
   integer IDAT(*)
   integer IERR, kprob
   logical samex
+  integer::myflag(10) 
+
 
   if( TASK.eq.0 ) then 
      !
@@ -591,7 +595,8 @@ subroutine EV_JAC_G(TASK, N, X, NEW_X, M, NZ, ACON, AVAR, A,IDAT, DAT, IERR)
      !---- TOTAL GRADIENT OF CONSTRAINTS 
 
      kprob=IDAT(1)
-     probtype=IDAT(3)
+     probtype(1:N)=IDAT(3:N+2)
+
      do i=1,N
         sigmax(i)=DAT(i)
      end do
@@ -604,8 +609,7 @@ subroutine EV_JAC_G(TASK, N, X, NEW_X, M, NZ, ACON, AVAR, A,IDAT, DAT, IERR)
      !---- MEAN OF INEQUALITY CONSTRAINT i
      !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),1,2,3,0,probtype,&
-          &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),1,2,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
         if (IDAT(2).eq.1) then ! Deterministic with PC
            fvartmp=0.0d0
@@ -707,6 +711,7 @@ subroutine EV_HESS(TASK, N, X, NEW_X, OBJFACT, M, LAM, NEW_LAM,NNZH, IRNH, ICNH,
   double precision DAT(*)
   integer IDAT(*), kprob
   integer IERR
+  integer::myflag(10) 
 
   if( TASK.eq.0 ) then
      !
