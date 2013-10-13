@@ -84,14 +84,22 @@ program problemPC
   dat(1000+12)=0.005    ! in  max_u_disp=dat(12)
   dat(1000+13)=0.005    ! in  max_v_disp=dat(12)
   dat(1000+14)=1.0      ! Factor of safety
-  dat(1000+20)=77       ! filenum for PC
+  dat(1000+20)=77      ! filenum for PC
 
   !============
   !  DAT array
   !============
   
-  !1 to N are used to store sigmax
-  !100 is used to store the fmeantmp,fvartmp
+  ! 1 to N are used to store sigmax
+
+  ! N+1--> fmeantmp
+  ! N+2--> fvartmp
+
+  ! N+2+1 to 2*N+2  --> fmeanprime(i)+fvarprime(i)
+  ! 2N*+2+1 to 3N+2 --> x(i)
+
+
+
   !1000+ is used to pass data to PC 
   
   !==================!
@@ -104,19 +112,21 @@ program problemPC
 
   !Other IPOPT params
 
-  probtype=2
-  kprob=0
+  probtype(1:3)=1
+  probtype(4:6)=1
+
+  kprob=4
 
   ! SD for area design variables
-  sigmax(1)=0.05
-  sigmax(2)=0.05
-  sigmax(3)=0.05
+  sigmax(1)=0.075
+  sigmax(2)=0.075
+  sigmax(3)=0.075
 
   ! SD for orientation phi
 
-  sigmax(4)=1.0*pi/180.0
-  sigmax(5)=1.0*pi/180.0
-  sigmax(6)=1.0*pi/180.0
+  sigmax(4)=2.0*pi/180.0
+  sigmax(5)=2.0*pi/180.0
+  sigmax(6)=2.0*pi/180.0
 
   do i=i,n
      dat(i)=sigmax(i)
@@ -124,7 +134,7 @@ program problemPC
 
   IDAT(1)=kprob
   IDAT(2)=0
-  IDAT(3)=probtype
+  IDAT(3:N+2)=probtype(1:N)
 
   ! Area design variables
 
@@ -154,6 +164,7 @@ program problemPC
   !
   !     Set bounds for the constraints
   !
+
   do i=1,M
      G_L(i)=-infbound
      G_U(i)=0.d0
@@ -172,6 +183,10 @@ program problemPC
   !
   !     Open an output file
   !
+  
+if (id_proc.eq.0) open(unit=86,file='Opt.his',form='formatted',status='replace')
+
+
   IERR = IPOPENOUTPUTFILE(IPROBLEM, 'IPOPT.OUT', 5)
   if (IERR.ne.0 ) then
      write(*,*) 'Error opening the Ipopt output file.'
@@ -197,6 +212,7 @@ program problemPC
      IERR = IPADDINTOPTION(IPROBLEM, 'print_level', 0)
      if (IERR.ne.0 ) goto 9990
   end if
+  
 
   IERR = IPSOLVE(IPROBLEM, X, G, F, LAM, Z_L, Z_U, IDAT, DAT)
 
@@ -234,15 +250,19 @@ program problemPC
         write(*,*) 'LAM(',i,') = ',LAM(i)
      enddo
      write(*,*)
-     write(*,*) 'Weight and its variance:',DAT(100+1),DAT(100+2)
+     write(*,*) 'Weight and its variance:',DAT(N+1),DAT(N+2)
 
   end if
   !
 9000 continue
+
   !
   !     Clean up
   !
+
   call IPFREE(IPROBLEM)
+
+  if (id_proc.eq.0) close(86)
 
   call stop_all
   !
@@ -271,22 +291,21 @@ subroutine EV_F(N, X, NEW_X, F, IDAT, DAT, IERR)
   integer IERR
   double precision fmin,fmax,gradmin(N-1),gradmax(N-1),gtol,low(N-1),up(N-1),Xsave(N)
   double precision  rho, L, sigmay, pi, p, E, Fs 
-
-  
+  integer::myflag(10) 
 
   kprob=IDAT(1)
-  probtype=IDAT(3)
+  probtype(1:N)=IDAT(3:N+2)
 
   do i=1,N
      sigmax(i)=DAT(i)
+     Xsave(i)=X(i)
   end do
 
   !---- MEAN and VARIANCE OF worst OBJECTIVE FUNCTION
 
-!call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
+  !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
 
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),3,3,0,probtype,&
-       &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),1,3,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
 
   if (IDAT(2).eq.1) then ! Deterministic with PC
@@ -294,10 +313,21 @@ subroutine EV_F(N, X, NEW_X, F, IDAT, DAT, IERR)
      fvarprimetmp=0.0d0
   end if
 
-  dat(100+1)=fmeantmp
-  dat(100+2)=fvartmp
-  
-  
+  dat(N+1)=fmeantmp
+  dat(N+2)=fvartmp
+
+  ! Store gradients for later use
+
+  do i=1,N
+     dat(N+2+i)=fmeanprimetmp(i)+fvarprimetmp(i)
+  end do
+
+  ! Store x
+  do i=1,n
+     DAT(2*N+2+i)=Xsave(i)
+     X(i)=Xsave(i)
+  end do
+
   if (id_proc.eq.0) then
      print*,''
      write(*,'(4x,a,3F13.4)') '>>Objective:',fmeantmp,fvartmp,fmeantmp+fvartmp
@@ -320,6 +350,7 @@ end subroutine EV_F
 !
 ! =============================================================================
 !
+
 subroutine EV_G(N, X, NEW_X, M, G, IDAT, DAT, IERR)
   use dimpce,only:probtype,id_proc
 
@@ -330,32 +361,44 @@ subroutine EV_G(N, X, NEW_X, M, G, IDAT, DAT, IERR)
   real*8 :: fmeandbleprimetmp(n,n),fvardbleprimetmp(n,n)
   integer IDAT(*),kprob,NMC
   integer IERR, i, j, cnt
-  double precision fmin,fmax,gradmin(N-1),gradmax(N-1),gtol,low(N-1),up(N-1),Xsave(N)
-  double precision  rho, L, sigmay, pi, p, E, Fs 
-
+  double precision::fmin,fmax,gradmin(N-1),gradmax(N-1),gtol,low(N-1),up(N-1),Xsave(N)
+  double precision :: rho, L, sigmay, pi, p, E, Fs
+  integer::myflag(10) 
 
   kprob=IDAT(1)
-  probtype=IDAT(3)
+  probtype(1:N)=IDAT(3:N+2)
+
   do i=1,N
      sigmax(i)=DAT(i)
+     Xsave(i)=X(i)
   end do
 
   do i=1,M
 
      !---- MEAN OF INEQUALITY CONSTRAINT i
      !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
+!     if (id_proc.eq.0) print*,x
+     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),1,3,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+!     if (id_proc.eq.0) print*,fmeanprimetmp,fvarprimetmp
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),3,3,0,probtype,&
-          &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+     cmean(i)=fmeantmp
+     cstd(i)=sqrt(fvartmp)
 
-  if (IDAT(2).eq.1) then ! Deterministic with PC
-     fvartmp=0.0d0
-     fvarprimetmp=0.0d0
-  end if
+     do j=1,N
+        dc(i,j)=fmeanprimetmp(j)
+        if (fvartmp.ne.0.0) then
+           dc(i,j)=dc(i,j)+dble(kprob)*fvarprimetmp(j)/(2.0*sqrt(fvartmp))
+        endif
+     end do
 
-  G(i)=fmeantmp+dble(kprob)*sqrt(fvartmp)
+     if (IDAT(2).eq.1) then ! Deterministic with PC
+        fvartmp=0.0d0
+        fvarprimetmp=0.0d0
+     end if
 
-end do
+  end do
+
+  G(1:M)=cmean(1:M)+dble(kprob)*cstd(1:M)
 
   !Just printing
 
@@ -368,6 +411,20 @@ end do
      print*,''
   end if
 
+  do i=1,N
+     DAT(3*N+2+i)=Xsave(i)
+     X(i)=Xsave(i)
+  end do
+
+  cnt=0
+  do i=1,M
+     do j=1,N
+        cnt=cnt+1
+        DAT(4*N+2+cnt)=dc(i,j)
+     end do
+  end do
+
+
   IERR = 0
   return
 end subroutine EV_G
@@ -379,6 +436,7 @@ end subroutine EV_G
 !
 ! =============================================================================
 !
+
 subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
   use dimpce,only:probtype,id_proc
 
@@ -390,45 +448,61 @@ subroutine EV_GRAD_F(N, X, NEW_X, GRAD, IDAT, DAT, IERR)
   integer IDAT(*),kprob,NMC
   integer IERR
   double precision  rho, L, sigmay, pi, p, E, Fs 
+  integer::myflag(10) 
+  logical samex
 
-  kprob=IDAT(1)
-  probtype= IDAT(3)
-
+  
+  samex=.true.
   do i=1,N
-     sigmax(i)=DAT(i)
+     if (x(i).ne.DAT(2*N+2+i)) samex=.false. 
   end do
-
-  !---- MEAN OF INEQUALITY CONSTRAINT i
-  !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
   
-  call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),3,3,0,probtype,&
-       &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+  if (samex) then
 
+     if (id_proc.eq.0) print *,'Samex in obj'
+     !---- TOTAL GRADIENT OF OBJECTIVE FUNCTION
+     do i=1,n
+        GRAD(i)=DAT(N+2+i)
+     end do
+     if (id_proc.eq.0) print *,'grad obj',grad
 
-  !---- GRADIENT OF OBJECTIVE FUNCTION
+  else
 
-  
-  if (id_proc.eq.0)then
-     print *,' >> Gradient of obj:'
-  end if
+     kprob=IDAT(1)
+     probtype(1:N)=IDAT(3:N+2)
 
+     do i=1,N
+        sigmax(i)=DAT(i)
+     end do
+     
+     !---- MEAN OF INEQUALITY CONSTRAINT i
+     !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
+     
+     call  PCestimate(N,x,sigmax,12,0,DAT(1001:1020),1,3,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
 
-  do i=1,n
+     !---- GRADIENT OF OBJECTIVE FUNCTION
 
-
-     if (IDAT(2).eq.1) then ! Deterministic with PC
-        fvartmp=0.0d0
-        fvarprimetmp=0.0d0
+     if (id_proc.eq.0)then
+        print *,' >> Gradient of obj:'
      end if
 
-  if (id_proc.eq.0)  print*,fmeanprimetmp(i),fvarprimetmp(i)
+     do i=1,n
 
-     GRAD(i)=fmeanprimetmp(i)+fvarprimetmp(i)
+        if (IDAT(2).eq.1) then ! Deterministic with PC
+           fvartmp=0.0d0
+           fvarprimetmp=0.0d0
+        end if
 
-  end do
+        if (id_proc.eq.0)  print*,fmeanprimetmp(i),fvarprimetmp(i)
 
-if (id_proc.eq.0)print *,''
+        GRAD(i)=fmeanprimetmp(i)+fvarprimetmp(i)
 
+     end do
+
+  end if
+
+  if (id_proc.eq.0)print *,''
+  
   IERR = 0
   return
 end subroutine EV_GRAD_F
@@ -453,6 +527,8 @@ subroutine EV_JAC_G(TASK, N, X, NEW_X, M, NZ, ACON, AVAR, A,IDAT, DAT, IERR)
   integer IDAT(*)
   integer IERR, kprob
   logical samex
+  integer::myflag(10) 
+
 
   if( TASK.eq.0 ) then 
      !
@@ -582,112 +658,129 @@ subroutine EV_JAC_G(TASK, N, X, NEW_X, M, NZ, ACON, AVAR, A,IDAT, DAT, IERR)
          AVAR(47) =5
          ACON(48) =8
          AVAR(48) =6
+         
+         
+      else
+         
+         
+         samex=.true.
+         do i=1,N
+            if (x(i).ne.DAT(3*N+2+i)) samex=.false. 
+         end do
+
+         if (samex) then
+
+            if (id_proc.eq.0) print *,'Samex in con'
+
+            cnt=0
+            do i=1,M
+               do j=1,N
+                  cnt=cnt+1
+                  cgrad(i,j)=DAT(4*N+2+cnt)
+               end do
+            end do
+
+         else !not samex
+
+            !---- TOTAL GRADIENT OF CONSTRAINTS 
+
+            kprob=IDAT(1)
+            probtype(1:N)=IDAT(3:N+2)
+
+            do i=1,N
+               sigmax(i)=DAT(i)
+            end do
 
 
-  
-  else
+            cgrad(:,:)=0.0
+
+            do i=1,M
+
+               !---- MEAN OF INEQUALITY CONSTRAINT i
+               !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
+
+               call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),1,3,3,0,probtype,fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+
+               if (IDAT(2).eq.1) then ! Deterministic with PC
+                  fvartmp=0.0d0
+                  fvarprimetmp=0.0d0
+               end if
 
 
-     !---- TOTAL GRADIENT OF CONSTRAINTS 
+               do j=1,N
+                  cgrad(i,j)=fmeanprimetmp(j)
+                  if (fvartmp.ne.0.0) then
+                     cgrad(i,j)=cgrad(i,j)+dble(kprob)*fvarprimetmp(j)/(2.0*sqrt(fvartmp))
+                  endif
+               end do
+            end do
+         end if
 
-     kprob=IDAT(1)
-     probtype=IDAT(3)
-     do i=1,N
-        sigmax(i)=DAT(i)
-     end do
+            ! Assemble
+            A(1)=cgrad(1,1)
+            A(2)=cgrad(1,2)
+            A(3)=cgrad(1,3)
+            A(4)=cgrad(1,4)
+            A(5)=cgrad(1,5)
+            A(6)=cgrad(1,6)
 
+            A(7)=cgrad(2,1)
+            A(8)=cgrad(2,2)
+            A(9)=cgrad(2,3)
+            A(10)=cgrad(2,4)
+            A(11)=cgrad(2,5)
+            A(12)=cgrad(2,6)
 
-     cgrad(:,:)=0.0
+            A(13)=cgrad(3,1)
+            A(14)=cgrad(3,2)
+            A(15)=cgrad(3,3)
+            A(16)=cgrad(3,4)
+            A(17)=cgrad(3,5)
+            A(18)=cgrad(3,6)
 
-     do i=1,M
+            A(19)=cgrad(4,1)
+            A(20)=cgrad(4,2)
+            A(21)=cgrad(4,3)
+            A(22)=cgrad(4,4)
+            A(23)=cgrad(4,5)
+            A(24)=cgrad(4,6)
 
-     !---- MEAN OF INEQUALITY CONSTRAINT i
-     !call  PCestimate(dim,xavgin,xstdin,fctin,fctindxin,DATIN,orderinitial,orderfinal,statin,probtypeIN,sampfac,fmeanout,fvarout,fmeanprimeout,fvarprimeout,fmeandbleprimeout,fvardbleprimeout)
+            A(25)=cgrad(5,1)
+            A(26)=cgrad(5,2)
+            A(27)=cgrad(5,3)
+            A(28)=cgrad(5,4)
+            A(29)=cgrad(5,5)
+            A(30)=cgrad(5,6)
 
-     call  PCestimate(N,x,sigmax,12,i,DAT(1001:1020),3,3,0,probtype,&
-          &fmeantmp,fvartmp,fmeanprimetmp,fvarprimetmp,fmeandbleprimetmp,fvardbleprimetmp)
+            A(31)=cgrad(6,1)
+            A(32)=cgrad(6,2)
+            A(33)=cgrad(6,3)
+            A(34)=cgrad(6,4)
+            A(35)=cgrad(6,5)
+            A(36)=cgrad(6,6)
 
-        if (IDAT(2).eq.1) then ! Deterministic with PC
-           fvartmp=0.0d0
-           fvarprimetmp=0.0d0
-        end if
-        
-        
-        do j=1,N
-           cgrad(i,j)=fmeanprimetmp(j)
-           if (fvartmp.ne.0.0) then
-              cgrad(i,j)=cgrad(i,j)+dble(kprob)*fvarprimetmp(j)/(2.0*sqrt(fvartmp))
-           endif
-        end do
-     end do
-     
+            A(37)=cgrad(7,1)
+            A(38)=cgrad(7,2)
+            A(39)=cgrad(7,3)
+            A(40)=cgrad(7,4)
+            A(41)=cgrad(7,5)
+            A(42)=cgrad(7,6)
 
-         ! Assemble
-         A(1)=cgrad(1,1)
-         A(2)=cgrad(1,2)
-         A(3)=cgrad(1,3)
-         A(4)=cgrad(1,4)
-         A(5)=cgrad(1,5)
-         A(6)=cgrad(1,6)
-
-         A(7)=cgrad(2,1)
-         A(8)=cgrad(2,2)
-         A(9)=cgrad(2,3)
-         A(10)=cgrad(2,4)
-         A(11)=cgrad(2,5)
-         A(12)=cgrad(2,6)
-
-         A(13)=cgrad(3,1)
-         A(14)=cgrad(3,2)
-         A(15)=cgrad(3,3)
-         A(16)=cgrad(3,4)
-         A(17)=cgrad(3,5)
-         A(18)=cgrad(3,6)
-
-         A(19)=cgrad(4,1)
-         A(20)=cgrad(4,2)
-         A(21)=cgrad(4,3)
-         A(22)=cgrad(4,4)
-         A(23)=cgrad(4,5)
-         A(24)=cgrad(4,6)
-
-         A(25)=cgrad(5,1)
-         A(26)=cgrad(5,2)
-         A(27)=cgrad(5,3)
-         A(28)=cgrad(5,4)
-         A(29)=cgrad(5,5)
-         A(30)=cgrad(5,6)
-
-         A(31)=cgrad(6,1)
-         A(32)=cgrad(6,2)
-         A(33)=cgrad(6,3)
-         A(34)=cgrad(6,4)
-         A(35)=cgrad(6,5)
-         A(36)=cgrad(6,6)
-
-         A(37)=cgrad(7,1)
-         A(38)=cgrad(7,2)
-         A(39)=cgrad(7,3)
-         A(40)=cgrad(7,4)
-         A(41)=cgrad(7,5)
-         A(42)=cgrad(7,6)
-
-         A(43)=cgrad(8,1)
-         A(44)=cgrad(8,2)
-         A(45)=cgrad(8,3)
-         A(46)=cgrad(8,4)
-         A(47)=cgrad(8,5)
-         A(48)=cgrad(8,6)
+            A(43)=cgrad(8,1)
+            A(44)=cgrad(8,2)
+            A(45)=cgrad(8,3)
+            A(46)=cgrad(8,4)
+            A(47)=cgrad(8,5)
+            A(48)=cgrad(8,6)
 
 
 
 
-     !if (id_proc.eq.0) print *,'Cons Gradients',jac(1:6)
+            !if (id_proc.eq.0) print *,'Cons Gradients',jac(1:6)
 
-  end if
+         end if
 
-
-  IERR = 0
+         IERR = 0
   return
 end subroutine EV_JAC_G
 !
@@ -707,6 +800,7 @@ subroutine EV_HESS(TASK, N, X, NEW_X, OBJFACT, M, LAM, NEW_LAM,NNZH, IRNH, ICNH,
   double precision DAT(*)
   integer IDAT(*), kprob
   integer IERR
+  integer::myflag(10) 
 
   if( TASK.eq.0 ) then
      !
@@ -787,7 +881,6 @@ subroutine EV_HESS(TASK, N, X, NEW_X, OBJFACT, M, LAM, NEW_LAM,NNZH, IRNH, ICNH,
        
          IRNH(21) = 6
          ICNH(21) = 1
-         
  
   else
 
@@ -882,6 +975,7 @@ subroutine ITER_CB(ALG_MODE, ITER_COUNT,OBJVAL, INF_PR, INF_DU,MU, DNORM, REGU_S
      end if
 
      write(*,'(i5,5e15.7)') ITER_COUNT,OBJVAL,DNORM,INF_PR,INF_DU,MU
+     write(86,*) 'iter    objective      ||grad||        inf_pr          inf_du         lg(mu)'
 
   end if
   !
@@ -889,7 +983,7 @@ subroutine ITER_CB(ALG_MODE, ITER_COUNT,OBJVAL, INF_PR, INF_DU,MU, DNORM, REGU_S
   !     simple example.
   !
   
-  if (ITER_COUNT .gt. 1 .and. DNORM.le.0.5D-02.and.inf_pr.le.1.0d-02) then
+  if (ITER_COUNT .gt. 1 .and. DNORM.le.1.0D-02.and.inf_pr.le.1.0d-03) then
 
      ISTOP = 1
 
